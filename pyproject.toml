@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mulambda-experiments"
+authors = [
+    { name = "Silvio Vasiljevic", email = "silvio.vasiljevic@gmail.com" }
+]
+dynamic = ["version"]
+description = "Experiments for MuLambda"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "jupyter",
+    "galileo-jupyter>=0.0.2.dev11",
+    "edgerun-galileo-experiments>=0.0.2.dev11",
+    "edgerun-galileo-experiments-extensions==0.0.1.dev11",
+    "galileo-db>=0.10.5.dev1",
+    "edgerun-skippy-core==0.1.1",
+    "edgerun-faas==0.0.1.dev3",
+    "edgerun-galileo-faas==0.0.1.dev5",
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+dev = ["pytest",
+    "black[d]",
+    "ruff",
+    "pre-commit"
+]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+include = ["mulambda-experiments*"]
+exclude = ["assets*", "tests*"]
+
+[tool.ruff]
+# pyflakes, pycodestyle, isort
+select = ["F", "E", "W", "I001"]
+target-version = "py310"
