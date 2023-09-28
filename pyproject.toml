@@ -10,7 +10,7 @@ authors = [
 dynamic = ["version"]
 description = "Experiments for MuLambda"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 dependencies = [
     "jupyter",
     "galileo-jupyter>=0.0.2.dev11",

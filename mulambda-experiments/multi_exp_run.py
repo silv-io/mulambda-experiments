@@ -39,17 +39,21 @@ def run_experiment(exp_id, target, usecase, amount, size, iterations):
 
 
 if __name__ == '__main__':
-    exp_id = "logical-mult-28d9"
+    exp_id = "log-mult-rem"
     targets = ["mulambda-client", "plain-net-latency-client", "random-client",
                "round-robin-client"]
-    usecases = ["scp", "mda", "psa", "env"]
-    amounts = [100]
-    sizes = [10]
-    iterations = [5]
+    usecases = ["env", "scp", "mda", "psa"]
+    amounts = [100, 1000]
+    sizes = [10, 1000]
+    iterations = [5, 10]
+    exp_amount = len(targets) * len(usecases) * len(amounts) * len(sizes) * len(
+        iterations)
+    current_exp = 1
     for iteration in iterations:
         for size in sizes:
             for amount in amounts:
                 for usecase in usecases:
                     for target in targets:
+                        print(f"running experiment {current_exp}/{exp_amount}")
                         run_experiment(exp_id, target, usecase, amount, size, iteration)
-    # run_experiment("test", "mulambda-client", "scp", 10, 10, 5)
+                        current_exp += 1
