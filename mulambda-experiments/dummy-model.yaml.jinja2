@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: "{{ model_id }}"
+  name: "{{ model_id }}"
+  namespace: mulambda
+spec:
+  selector:
+    matchLabels:
+      app: "{{ model_id }}"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: "{{ model_id }}"
+    spec:
+      containers:
+        - name: model
+          image: agihi/mulambda:latest
+          imagePullPolicy: Always
+          command: [ "make", "run-dummy" ]
+          env:
+            - name: MULAMBDA_DUMMY__DELAY__BASE
+              value: "{{ D }}"
+            - name: MULAMBDA_DUMMY__DELAY__SIZE_IMPACT
+              value: "{{ alpha }}"
+            - name: MULAMBDA_DUMMY__DELAY__CONCURRENCY_IMPACT
+              value: "{{ beta }}"
+            - name: MULAMBDA_DUMMY__DELAY__MAX_JITTER
+              value: "{{ J }}"
+            - name: MULAMBDA_DUMMY__FEATURES__MAX_CONFIDENCES
+              value: "{{ confidences }}"
+            - name: MULAMBDA_DUMMY__FEATURES__SET_SIZE_IMPACT
+              value: "{{ gamma }}"
+        - name: companion
+          image: agihi/mulambda:latest
+          command: [ "make", "run-companion" ]
+          imagePullPolicy: Always
+          env:
+            - name: MULAMBDA_COMPANION__MODEL__ID
+              value: "{{ model_id }}"
+            - name: MULAMBDA_COMPANION__MODEL__NAME
+              value: "{{ Name }}"
+            - name: MULAMBDA_COMPANION__MODEL__TYPE
+              value: "dummy"
+            - name: MULAMBDA_COMPANION__MODEL__INPUT
+              value: "dummy"
+            - name: MULAMBDA_COMPANION__MODEL__OUTPUT
+              value: "dummy"
+            - name: MULAMBDA_COMPANION__MODEL__ACCURACY
+              value: "{{ confidences[0] }}"
+            - name: MULAMBDA_COMPANION__MODEL__PATH
+              value: "/"
+            - name: MULAMBDA_COMPANION__MODEL__PORT
+              value: "80"
+      nodeSelector:
+        ether.edgerun.io/zone: zone-c
+        kubernetes.io/hostname: "s30-worker-zone-c-{{ node_id }}"
+        node-role.kubernetes.io/worker: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ model_id }}"
+  namespace: mulambda
+spec:
+  selector:
+    app: "{{ model_id }}"
+  ports:
+    - name: dummy-endpoint
+      port: 80
+      targetPort: 80
+  type: ClusterIP

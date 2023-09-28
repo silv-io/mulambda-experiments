@@ -21,6 +21,10 @@ dependencies = [
     "edgerun-faas==0.0.1.dev3",
     "edgerun-galileo-faas==0.0.1.dev5",
     "python-dotenv",
+    "kubernetes",
+    "jinja2",
+    "paramiko",
+    "seaborn"
 ]
 
 [project.optional-dependencies]
