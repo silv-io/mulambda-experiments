@@ -85,7 +85,12 @@ DUMMY_MODELS = (
 MODEL_IDS = range(len(DUMMY_MODELS))
 
 SCENARIOS = {
-    "parity": [MODEL_IDS, MODEL_IDS, MODEL_IDS, MODEL_IDS],
+    "parity": [
+        [0, 4, 5, 8],
+        [0, 4, 5, 8],
+        [0, 4, 5, 8],
+        [0, 4, 5, 8],
+    ],
     "hyperlocal": [MODEL_IDS, [], [], []],
     "logical": [
         [0, 1, 5, 8],

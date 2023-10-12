@@ -3,7 +3,9 @@ import uuid
 import pandas as pd
 from kubernetes import client, config, watch
 
-NODE_HOSTS = [f"s30-worker-zone-c-{node_id}" for node_id in range(4)] + ["s20-controller-zone-c-0"]
+NODE_HOSTS = [f"s30-worker-zone-c-{node_id}" for node_id in range(4)] + [
+    "s20-controller-zone-c-0"]
+
 
 def short_uid():
     return str(uuid.uuid4().hex[:8])
@@ -102,3 +104,11 @@ def wait_for_job_completion(job_name: str):
             w.stop()
             print("Job failed.")
             return
+
+
+def mkdir(path):
+    import os
+    try:
+        os.mkdir(path)
+    except FileExistsError:
+        pass
