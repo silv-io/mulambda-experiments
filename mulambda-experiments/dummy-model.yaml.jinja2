@@ -33,6 +33,8 @@ spec:
               value: "{{ confidences }}"
             - name: MULAMBDA_DUMMY__FEATURES__SET_SIZE_IMPACT
               value: "{{ gamma }}"
+            - name: MULAMBDA_DUMMY__NODE__ID
+              value: "{{ node_id }}"
         - name: companion
           image: agihi/mulambda:latest
           command: [ "make", "run-companion" ]

@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 from galileo.shell.shell import init
 from galileo.worker.context import Context
-from util import NODE_HOSTS, create_experiment_job
+from util import create_experiment_job
 
 load_dotenv()
 ctx = Context()
@@ -12,7 +12,7 @@ telemd = g['telemd']
 
 
 def run_experiment(exp_id, target, usecase, amount, size, iterations):
-    telemd.start_telemd(NODE_HOSTS)
+    # telemd.start_telemd(NODE_HOSTS)
     exp.start(name=f"exp-{exp_id}-{target}-{usecase}-{amount}-{size}-{iterations}",
               creator="silvio",
               metadata={"exp_id": exp_id, "target": target, "usecase": usecase,
@@ -34,7 +34,7 @@ def run_experiment(exp_id, target, usecase, amount, size, iterations):
                 if received_iterations == iterations:
                     break
     print("wait over!")
-    telemd.stop_telemd()
+    # telemd.stop_telemd()
     exp.stop()
 
 
