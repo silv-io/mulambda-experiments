@@ -3,6 +3,7 @@ import warnings
 from typing import Dict, List
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 from dotenv import load_dotenv
@@ -31,6 +32,13 @@ colors = {
     "plain-net-latency-client": "#FFBF00",
     "random-client": "#FF6BAB",
     "round-robin-client": "#42C268",
+}
+
+util_colors = {
+    "mulambda-client": ["#9748FF", "#ab6cff", "#c59aff", "#d5b5ff"],
+    "plain-net-latency-client": ["#FFBF00", "#ffcb32", "#ffdb72", "#ffe599"],
+    "random-client": ["#FF6BAB", "#ff88bb", "#feadd0", "#ffbcd9"],
+    "round-robin-client": ["#42C268", "#67ce86", "#8ddaa4", "#a9e3bb"],
 }
 
 metrics = {
@@ -107,7 +115,7 @@ def time_series(gw: K3SGateway, exps: pd.DataFrame, metric: str, constraints: Di
                 schedule: str = "Unknown",
                 rolling: bool = True, base_dir: str = "plots", format: str = "pdf"):
     plt.tight_layout()
-    plt.figure(figsize=(8, 5))
+    plt.figure(figsize=(10, 5))
     for idx, exp in exps.iterrows():
         ev = get_clear_events(gw, exp["EXP_ID"])
         meta = json.loads(exp["metadata"])
@@ -189,7 +197,8 @@ def extract_schedule(name: str) -> str:
 
 
 def generate_base_plots(gw: K3SGateway, exps: pd.DataFrame, constraints: Dict,
-                        prefices: List[str], base_dir: str = "plots", format: str = "pdf"):
+                        prefices: List[str], base_dir: str = "plots",
+                        format: str = "pdf"):
     logical_exps = filter(exps[exps["SCHEDULE"] == "logical"], constraints,
                           id_prefices=prefices)
     arbitrary_exps = filter(exps[exps["SCHEDULE"] == "arbitrary"], constraints,
@@ -201,7 +210,7 @@ def generate_base_plots(gw: K3SGateway, exps: pd.DataFrame, constraints: Dict,
         f"with logical: {logical_exps.NAME.tolist()} "
         f"and arbitrary: {arbitrary_exps.NAME.tolist()}")
     for metric in ["model_accuracy", "elapsed"]:
-        fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+        fig, axes = plt.subplots(2, 2, figsize=(10, 9))
         ecdf(gw, logical_exps, metric, constraints, schedule="logical",
              parent_ax=axes[0][0])
         boxplot(gw, logical_exps, metric, constraints, schedule="logical",
@@ -211,8 +220,127 @@ def generate_base_plots(gw: K3SGateway, exps: pd.DataFrame, constraints: Dict,
         boxplot(gw, arbitrary_exps, metric, constraints, schedule="arbitrary",
                 parent_ax=axes[1][1])
         plt.tight_layout()
-        plt.savefig(f"{base_dir}/ecdfbox-{metric}-{constraints['usecase']}-base.{format}")
+        plt.savefig(
+            f"{base_dir}/ecdfbox-{metric}-{constraints['usecase']}-base.{format}")
         plt.clf()
+
+
+def generate_edge_plots(gw: K3SGateway, exps: pd.DataFrame, constraints: Dict,
+                        prefices: List[str], base_dir: str = "plots",
+                        format: str = "pdf"):
+    hyperlocal_exps = filter(exps[exps["SCHEDULE"] == "hyperlocal"], constraints,
+                             id_prefices=prefices)
+    parity_exps = filter(exps[exps["SCHEDULE"] == "parity"], constraints,
+                         id_prefices=prefices)
+    if len(hyperlocal_exps) < 4 or len(parity_exps) < 4:
+        return
+    print(
+        f"Generating edge plots for {constraints['usecase']} "
+        f"with hyperlocal: {hyperlocal_exps.NAME.tolist()} "
+        f"and parity: {parity_exps.NAME.tolist()}")
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+    ecdf(gw, hyperlocal_exps, "elapsed", constraints, schedule="hyperlocal",
+         parent_ax=axes[0])
+    ecdf(gw, hyperlocal_exps, "model_accuracy", constraints, schedule="hyperlocal",
+         parent_ax=axes[1])
+    plt.tight_layout()
+    plt.savefig(f"{base_dir}/ecdf-{constraints['usecase']}-hyperlocal.{format}")
+    plt.clf()
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+    ecdf(gw, parity_exps, "elapsed", constraints, schedule="parity",
+         parent_ax=axes[0])
+    ecdf(gw, parity_exps, "model_accuracy", constraints, schedule="parity",
+         parent_ax=axes[1])
+    plt.tight_layout()
+    plt.savefig(f"{base_dir}/ecdf-{constraints['usecase']}-parity.{format}")
+    plt.clf()
+
+
+UTIL_INTRO_PREFICE = "20231019"
+
+
+def generate_utilization(gw: K3SGateway, exps: pd.DataFrame, constraints: Dict,
+                         prefices: List[str], base_dir: str = "plots",
+                         format: str = "pdf"):
+    utilization_prefices = [p for p in prefices if p >= UTIL_INTRO_PREFICE]
+    for prefix in utilization_prefices:
+        test_exps = filter(exps[exps["SCHEDULE"] == "logical"], constraints,
+                           id_prefices=prefix)
+        if len(test_exps) < 4:
+            continue
+        print(
+            f"Generating utilization for {constraints['usecase']} "
+            f"with {test_exps.NAME.tolist()}"
+        )
+        fig, axes = plt.subplots(2, 2, figsize=(10, 9))
+        fig.suptitle(
+            f"Resource Utilization for {usecases[constraints['usecase']]} per selection algorithm")
+        test_exps["Target"] = test_exps["metadata"].apply(
+            lambda x: json.loads(x)["target"])
+        groups = test_exps.groupby("Target")["EXP_ID"].apply(list).reset_index()
+        for idx, group in groups.iterrows():
+            ax = axes[int(idx / 2)][idx % 2]
+            print(
+                f"Generating Utilization for {group['Target']} with {group['EXP_ID']}")
+            if len(group["EXP_ID"]) > 1:
+                print("ERROR: More than one experiment per target")
+            ev = pd.concat([get_clear_events(gw, exp_id) for exp_id in group["EXP_ID"]])
+            ev = get_clear_events(gw, group["EXP_ID"][0])
+            reqs = ev[ev["type"] == "request"].copy()
+            reqs["targeted_node"] = reqs["targeted_node"].astype("int")
+            reqs["start_time"] = reqs.index - pd.to_timedelta(reqs["elapsed"], unit="s")
+
+            time_intervals = pd.date_range(
+                start=min(reqs["start_time"]),
+                end=max(reqs.index),
+                freq="100L"
+            )
+            ev_counts = []
+            nodes = reqs["targeted_node"].unique()
+
+            for interval in time_intervals:
+                counts_per_node = [0, 0, 0, 0]
+                for node in nodes:
+                    count = ((reqs['start_time'] <= interval) & (
+                            reqs.index >= interval) & (
+                                     reqs["targeted_node"] == node)).sum()
+                    counts_per_node[node] = count
+                ev_counts.append(counts_per_node)
+
+            counts_df = pd.DataFrame(ev_counts)
+
+            counts_df.columns = ["Node 1", "Node 2", "Node 3", "Node 4"]
+            counts_df.index = counts_df.index * 0.1
+            counts_df.plot.area(ax=ax, stacked=True,
+                                color=util_colors[group["Target"]], linewidth=0)
+            ax.set_title(f"{clients[group['Target']]}")
+            ax.set_xlabel("Time since start [s]")
+            ax.set_ylabel("Number of Requests")
+        plt.tight_layout()
+        plt.savefig(f"{base_dir}/util-{constraints['usecase']}-{prefix}.{format}")
+        plt.clf()
+
+
+def generate_psa_shift():
+    accuracy_weights = [0.5] * 20 + [0.8] * 20 + [1.0] * 20 + [0.2] * 20 + [0] * 20
+    latency_weights = [0.5] * 20 + [0.2] * 20 + [0] * 20 + [0.8] * 20 + [1.0] * 20
+    df = pd.DataFrame({"Accuracy": accuracy_weights, "Latency": latency_weights})
+    plt.figure(figsize=(10, 5))
+    plt.tight_layout()
+    colors = {
+        "Accuracy": "#069e2d",
+        "Latency": "#4357ad"
+    }
+    sns.set_style("whitegrid")
+    for column in df.columns:
+        sns.lineplot(data=df, x=df.index, y=column, dashes=False, color=colors[column],
+                     label=column)
+    plt.legend()
+    plt.xlabel("Percent of passed requests in experiment")
+    plt.ylabel("Absolute Weights [0..1]")
+    plt.title("Weight Distribution Shift for ENV")
+    plt.savefig("plots/debug/env-shift.pdf")
+    plt.clf()
 
 
 def generate_days(gw: K3SGateway, prefices: List[str] | str):
@@ -226,7 +354,12 @@ def generate_days(gw: K3SGateway, prefices: List[str] | str):
 
     for usecase in ["scp", "mda", "psa", "env"]:
         constraints = {"usecase": usecase, "iterations": 5}
-        generate_base_plots(gw, exps, constraints, prefices, base_dir=base_dir, format="png")
+        # generate_base_plots(gw, exps, constraints, prefices, base_dir=base_dir,
+        #                     format="pdf")
+        # generate_edge_plots(gw, exps, constraints, prefices, base_dir=base_dir,
+        #                     format="pdf")
+        generate_utilization(gw, exps, constraints, prefices, base_dir=base_dir,
+                             format="pdf")
         # for schedule in ["logical", "arbitrary", "parity", "hyperlocal"]:
         #     test_exps = filter(exps[exps["SCHEDULE"] == schedule], constraints,
         #                        id_prefices=prefices)
@@ -237,16 +370,101 @@ def generate_days(gw: K3SGateway, prefices: List[str] | str):
         #         f"Generating {schedule} for {usecase} with: {test_exps.NAME.tolist()}")
         #     for metric in ["model_accuracy", "elapsed"]:
         #         ecdf(gw, test_exps, metric, constraints, schedule=schedule,
-        #              base_dir=base_dir, format="png")
-        for prefix in prefices:
-            test_exps = filter(exps[exps["SCHEDULE"] == "logical"], constraints,
-                               id_prefices=prefix)
-            if len(test_exps) < 4:
-                continue
-            for metric in ["model_accuracy", "elapsed"]:
-                time_series(gw, test_exps, metric, constraints,
-                            schedule="logical",
-                            base_dir=base_dir, format="png")
+        #              base_dir=base_dir, format="pdf")
+        # for prefix in prefices:
+        #     test_exps = filter(exps[exps["SCHEDULE"] == "logical"], constraints,
+        #                        id_prefices=prefix)
+        #     if len(test_exps) < 4:
+        #         continue
+        #     for metric in ["model_accuracy", "elapsed"]:
+        #         time_series(gw, test_exps, metric, constraints,
+        #                     schedule="logical",
+        #                     base_dir=base_dir, format="pdf")
+
+
+def extract_scale_type(name: str) -> str:
+    if "-it-scale-" in name:
+        return "Concurrency"
+    if "-size-scale-" in name:
+        return "Data Size"
+    else:
+        return "None"
+
+
+def generate_scale(gw: K3SGateway, prefices: List[str] | str):
+    if type(prefices) is str:
+        prefices = [prefices]
+    base_dir = f"plots/scale-{'-'.join(prefices)}"
+    mkdir(base_dir)
+
+    exps = gw.experiments()
+    exps["SCALE_TYPE"] = exps.NAME.apply(extract_scale_type)
+    index = [1, 3, 5, 8, 13, 21, 34, 55, 89]
+    columns = ["Scale", "Selector", "Metric", "Average", "Median", "StD", "Upper",
+               "Lower"]
+
+    aggregates = {}
+    for scale_type in ["Concurrency", "Data Size"]:
+        aggregates[scale_type] = pd.DataFrame(columns=columns)
+        for scale in index:
+            if scale_type == "Concurrency":
+                constraints = {"usecase": "psa", "iterations": scale}
+            elif scale_type == "Data Size":
+                constraints = {"usecase": "psa", "size": scale}
+            else:
+                break
+            test_exps = filter(exps[exps["SCALE_TYPE"] == scale_type], constraints,
+                               id_prefices=prefices)
+            print(test_exps.NAME.tolist())
+            for exp in test_exps.iterrows():
+                exp_id = exp[1]["EXP_ID"]
+                target = json.loads(exp[1]["metadata"])["target"]
+                ev = get_clear_events(gw, exp_id)
+                for metric in ["elapsed", "model_accuracy"]:
+                    avg = ev[metric].mean()
+                    median = ev[metric].median()
+                    std = ev[metric].std()
+                    if np.isnan(std):
+                        std = 0
+                    aggregates[scale_type] = aggregates[scale_type].append({
+                        "Scale": scale,
+                        "Selector": target,
+                        "Metric": metric,
+                        "Average": avg,
+                        "Median": median,
+                        "StD": std,
+                        "Upper": avg + 1.645 * std,
+                        "Lower": max(avg - 1.645 * std, 0)
+                    }, ignore_index=True)
+        aggregates[scale_type]["Scale"] = pd.to_numeric(aggregates[scale_type]["Scale"])
+        aggregates[scale_type].reset_index(drop=True, inplace=True)
+
+    for scale_type in ["Concurrency", "Data Size"]:
+        scale_df = aggregates[scale_type]
+        for metric in ["elapsed", "model_accuracy"]:
+            plt.tight_layout()
+            plt.figure(figsize=(10, 5))
+            metric_df = scale_df[scale_df["Metric"] == metric]
+            for selector in ["mulambda-client", "plain-net-latency-client",
+                             "random-client", "round-robin-client"]:
+                selector_df = metric_df[metric_df["Selector"] == selector]
+                sns.lineplot(data=selector_df, x="Scale",
+                             y="Average", label=clients[selector],
+                             color=colors[selector])
+                plt.fill_between(selector_df["Scale"], selector_df["Lower"],
+                                 selector_df["Upper"], alpha=0.1,
+                                 color=colors[selector])
+            if metric == "elapsed":
+                plt.ylabel("Average RTT [s]")
+            if metric == "model_accuracy":
+                plt.ylabel("Average Accuracy [%]")
+            if scale_type == "Concurrency":
+                plt.xlabel("Number of concurrent requests")
+            if scale_type == "Data Size":
+                plt.xlabel("Abstract size of data")
+            plt.title(f"Average {metrics[metric]} when scaling {scale_type}")
+            plt.savefig(f"{base_dir}/scale-{scale_type}-{metric}.pdf")
+            plt.clf()
 
 
 def debug(gw: K3SGateway):
@@ -264,4 +482,6 @@ if __name__ == '__main__':
     gw = K3SGateway.from_env()
     pd.set_option('display.max_colwidth', None)
     # debug(gw)
-    generate_days(gw, ["20231005", "20230928", "20230922", "20231012"])
+    generate_days(gw, ["20231005", "20230928", "20230922", "20231012", "20231019"])
+    # generate_psa_shift()
+    # generate_scale(gw, ["20231025"])
